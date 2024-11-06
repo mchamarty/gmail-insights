@@ -14,6 +14,7 @@ export interface EmailMetrics {
     isUnread: boolean;
     hasAttachments: boolean;
   }>;
+  timestamp?: string;  // Adding timestamp as an optional property
 }
 
 export const getGmailClient = (accessToken: string) => {

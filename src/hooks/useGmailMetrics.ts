@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import type { GmailMetrics } from '@/lib/gmail'; // Assuming there's a type definition for Gmail metrics
+import type { EmailMetrics } from '@/lib/gmail'; // Assuming there's a type definition for Gmail metrics
 
 export function useGmailMetrics() {
   const { data: session } = useSession();
-  const [data, setData] = useState<GmailMetrics | null>(null);
+  const [data, setData] = useState<EmailMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isOffline, setIsOffline] = useState(false);

@@ -9,9 +9,9 @@ import {
 import { 
   Target, Users, Clock, HelpCircle, ChevronUp, ChevronDown 
 } from 'lucide-react';
-import { useGmailMetrics } from '@/hooks/useGmailMetrics';
-import {OfflineIndicator} from '../ui/offline-indicator';
-import {ErrorMessage} from '../ui/error-message';
+import { useCalendarMetrics } from '@/hooks/useCalendarMetrics';
+import { OfflineIndicator } from '../ui/offline-indicator';
+import { ErrorMessage } from '../ui/error-message';
 
 // Types
 interface Metric {
@@ -86,10 +86,9 @@ const MetricCard: React.FC<{
 
 // Main Component
 const WorkloadImpactTab: React.FC<{ timeframe: string }> = ({ timeframe }) => {
-  const { data: emailData, isLoading, error, isOffline, retry } = useGmailMetrics();
+  const { data: calendarData, isLoading, error, isOffline, retry } = useCalendarMetrics();
 
-  // Placeholder data if the API fetch fails
-  const projectData = emailData?.projectData || {
+  const projectData = calendarData?.projectData || {
     workload: [
       { 
         name: "Q4 Planning", 
@@ -129,7 +128,7 @@ const WorkloadImpactTab: React.FC<{ timeframe: string }> = ({ timeframe }) => {
     ]
   };
 
-  const stakeholderData = emailData?.stakeholderData || {
+  const stakeholderData = calendarData?.stakeholderData || {
     interactions: [
       { group: "Engineering", direct: 45, indirect: 15, total: 60 },
       { group: "Product", direct: 35, indirect: 10, total: 45 }
@@ -145,7 +144,7 @@ const WorkloadImpactTab: React.FC<{ timeframe: string }> = ({ timeframe }) => {
     ]
   };
 
-  const impactMetrics = emailData?.impactMetrics || {
+  const impactMetrics = calendarData?.impactMetrics || {
     deliverables: [
       { category: "Technical Decisions", count: 15 },
       { category: "Process Improvements", count: 8 },
@@ -179,16 +178,98 @@ const WorkloadImpactTab: React.FC<{ timeframe: string }> = ({ timeframe }) => {
             }}
           >
             <div className="space-y-4">
-              {/* Project Data Cards */}
               {projectData.workload.map((project: any, idx: number) => (
                 <div key={idx} className="p-4 bg-gray-50 rounded-lg">
-                  {/* Project Details */}
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-medium">{project.name}</span>
+                    <span className={`px-2 py-1 rounded text-sm ${
+                      project.impact === 'high' ? 'bg-blue-100 text-blue-800' : 
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {project.impact === 'high' ? 'High Impact' : 'Medium Impact'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4 text-sm mb-3">
+                    <div>
+                      <div className="text-gray-600">Time Invested</div>
+                      <div className="font-medium">{project.hours}h</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">Meetings</div>
+                      <div className="font-medium">{project.meetings}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">Threads</div>
+                      <div className="font-medium">{project.threads}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">Collaborators</div>
+                      <div className="font-medium">{project.collaborators}</div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           </MetricCard>
 
-          {/* Remaining MetricCards for Stakeholder Engagement and Impact & Deliverables */}
+          <div className="grid grid-cols-2 gap-6">
+            <MetricCard
+              title="Stakeholder Engagement"
+              metric={{
+                icon: Users,
+                title: "Collaboration Analysis",
+                calculation: "Based on meeting participation and email thread analysis",
+                importance: "Shows your organizational reach and influence",
+                actions: [
+                  "Identify key stakeholder relationships",
+                  "Balance engagement across teams",
+                  "Track decision participation"
+                ]
+              }}
+            >
+              <div className="space-y-4">
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stakeholderData.interactions}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="group" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="direct" stackId="a" fill="#4f46e5" name="Direct" />
+                      <Bar dataKey="indirect" stackId="a" fill="#10b981" name="Indirect" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </MetricCard>
+
+            <MetricCard
+              title="Impact & Deliverables"
+              metric={{
+                icon: Target,
+                title: "Output Analysis",
+                calculation: "Tracked from email completions, calendar events, and key decisions",
+                importance: "Quantify your contributions and reliability",
+                actions: [
+                  "Highlight key achievements",
+                  "Track completion rate",
+                  "Document impact areas"
+                ]
+              }}
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {impactMetrics.deliverables.map((item, idx) => (
+                    <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-xl font-bold">{item.count}</div>
+                      <div className="text-sm text-gray-600">{item.category}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </MetricCard>
+          </div>
         </>
       )}
     </div>

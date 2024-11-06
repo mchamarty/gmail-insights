@@ -10,6 +10,7 @@ import { useGmailMetrics } from '@/hooks/useGmailMetrics';
 import { useCalendarMetrics } from '@/hooks/useCalendarMetrics';
 import { OfflineIndicator } from '@/components/ui/offline-indicator';
 import { ErrorMessage } from '@/components/ui/error-message';
+import MetricCard from '@/components/dashboard/shared/MetricCard';
 import type { CalendarEvent } from '@/lib/calendar';
 
 interface Metric {
@@ -18,17 +19,6 @@ interface Metric {
   calculation: string;
   importance: string;
   actions: string[];
-}
-
-interface BaseProps {
-  className?: string;
-  style?: React.CSSProperties;
-}
-
-interface MetricCardProps extends BaseProps {
-  title: string;
-  metric: Metric;
-  children?: React.ReactNode;
 }
 
 interface CurrentWorkloadTabProps {
@@ -58,14 +48,12 @@ const CurrentWorkloadTab = ({ timeframe }: CurrentWorkloadTabProps) => {
     error: calendarError 
   } = useCalendarMetrics();
   
-  const [isExpanded, setIsExpanded] = React.useState(false);
-
   const urgentItems = React.useMemo(() => {
     if (!emailData?.recentEmails) return [];
     
     return emailData.recentEmails
-      .filter(email => email.isUnread)
-      .map(email => ({
+      .filter((email: any) => email.isUnread)
+      .map((email: any) => ({
         type: 'email' as const,
         title: email.subject,
         from: email.from,
@@ -91,7 +79,7 @@ const CurrentWorkloadTab = ({ timeframe }: CurrentWorkloadTabProps) => {
   return (
     <div className="space-y-6">
       {isOffline && (
-        <OfflineIndicator timestamp={emailData?.timestamp} />
+        <OfflineIndicator timestamp={emailData?.timestamp ? Date.parse(emailData.timestamp) : undefined} />
       )}
 
       <MetricCard
@@ -112,7 +100,7 @@ const CurrentWorkloadTab = ({ timeframe }: CurrentWorkloadTabProps) => {
           {emailLoading ? (
             <div className="p-4 text-muted-foreground">Loading urgent items...</div>
           ) : urgentItems.length > 0 ? (
-            urgentItems.map((item, idx) => (
+            urgentItems.map((item: any, idx: number) => (
               <div 
                 key={idx}
                 className={`p-3 rounded-lg ${
@@ -161,7 +149,7 @@ const CurrentWorkloadTab = ({ timeframe }: CurrentWorkloadTabProps) => {
                 Error loading calendar: {calendarError.message}
               </div>
             ) : calendarData?.todaysMeetings.length ? (
-              calendarData.todaysMeetings.map((meeting) => (
+              calendarData.todaysMeetings.map((meeting: CalendarEvent) => (
                 <div key={meeting.id} className="p-3 bg-gray-50 rounded-lg">
                   <div className="flex justify-between items-center">
                     <div>

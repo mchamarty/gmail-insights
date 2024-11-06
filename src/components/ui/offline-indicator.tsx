@@ -33,7 +33,7 @@ export function OfflineIndicator({ timestamp }: OfflineIndicatorProps) {
           <WifiOff className="h-4 w-4" />
           <span>
             Offline
-            {timestamp ? (
+            {timestamp !== undefined ? (
               <span className="ml-1 text-xs">
                 (Last updated: {new Date(timestamp).toLocaleTimeString()})
               </span>

@@ -9,23 +9,39 @@ export interface CalendarEvent {
   attendees: number;
   isRecurring: boolean;
   isOptional: boolean;
-  hangoutLink?: string;
+  hangoutLink?: string | null;
 }
 
 export interface CalendarMetrics {
   todaysMeetings: CalendarEvent[];
   upcomingMeetings: CalendarEvent[];
   totalMeetingHours: number;
-  focusTimeBlocks: Array<{
-    start: string;
-    end: string;
-    duration: number;
-  }>;
+  focusTimeBlocks: Array<{ start: string; end: string; duration: number }>;
   meetingStats: {
     totalToday: number;
     optionalCount: number;
     backToBackCount: number;
     averageLength: number;
+  };
+  focusTimeData?: any;  // Define appropriate types here if possible
+  calendarStability?: any;
+  bufferAnalysis?: any;
+  weeklyPatterns?: any;
+  participantData?: any;
+  timeDistribution?: any;
+  
+  // Newly added properties for compatibility with WorkloadImpactTab and CurrentWorkloadTab
+  projectData?: {
+    workload: Array<any>; // Define specific type if known
+    weeklyEngagement: Array<any>;
+  };
+  stakeholderData?: {
+    interactions: Array<any>;
+    keyThreads: Array<any>;
+  };
+  impactMetrics?: {
+    deliverables: Array<any>;
+    completion: Array<any>;
   };
 }
 
@@ -110,6 +126,19 @@ export const getCalendarMetrics = async (accessToken: string): Promise<CalendarM
         backToBackCount,
         averageLength: events.length ? Math.round(totalMeetingMinutes / events.length) : 0,
       },
+      // Placeholder data for optional properties
+      projectData: {
+        workload: [],
+        weeklyEngagement: [],
+      },
+      stakeholderData: {
+        interactions: [],
+        keyThreads: [],
+      },
+      impactMetrics: {
+        deliverables: [],
+        completion: [],
+      }
     };
   } catch (error) {
     throw handleGoogleAPIError(error);
