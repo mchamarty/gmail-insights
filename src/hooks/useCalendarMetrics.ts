@@ -27,7 +27,7 @@ export function useCalendarMetrics() {
       setIsOffline(false); // Successfully fetched data, set offline state to false
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Unknown error'));
-      if (!navigator.onLine) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
         setIsOffline(true); // If offline, set offline state
       }
     } finally {

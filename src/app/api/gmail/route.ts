@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getServerSession } from 'next-auth/next';
 import { google, gmail_v1 } from 'googleapis';
 import { NextResponse } from 'next/server';

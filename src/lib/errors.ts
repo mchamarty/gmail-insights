@@ -20,7 +20,7 @@ export class APIError extends Error {
 
 export function handleGoogleAPIError(error: any): APIError {
   // Network errors
-  if (!navigator.onLine) {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
     return new APIError(
       'No internet connection. Please check your network.',
       0,

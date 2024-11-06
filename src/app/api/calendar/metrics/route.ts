@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from 'next/server';
 import { getCalendarMetrics } from '@/lib/calendar';
