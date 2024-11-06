@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { NextAuthProvider } from '@/providers/NextAuthProvider';
 import SignInButton from '@/components/SignInButton';
+import { Suspense } from 'react';
+import Loading from './loading';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,7 +20,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="light">
-      <head />
       <body className={`${inter.className} min-h-screen bg-background antialiased`}>
         <NextAuthProvider>
           <header className="p-4 border-b bg-white shadow-sm">
@@ -27,7 +28,11 @@ export default function RootLayout({
               <SignInButton />
             </div>
           </header>
-          <main>{children}</main>
+          <main className="container mx-auto py-6">
+            <Suspense fallback={<Loading />}>
+              {children}
+            </Suspense>
+          </main>
         </NextAuthProvider>
       </body>
     </html>

@@ -3,7 +3,6 @@ import GoogleProvider from "next-auth/providers/google";
 import type { JWT } from "next-auth/jwt";
 import type { Session } from "next-auth";
 
-// Extend the session and JWT interfaces
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
@@ -17,7 +16,8 @@ declare module "next-auth/jwt" {
   }
 }
 
-// Define the NextAuth options
+const baseUrl = "https://orange-eureka-97jw7v457wqx376vx-3000.app.github.dev";
+
 const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -29,13 +29,13 @@ const authOptions: NextAuthOptions = {
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
+          redirect_uri: `${baseUrl}/api/auth/callback/google`,
         },
       },
     }),
   ],
   callbacks: {
     async jwt({ token, account }) {
-      // Persist the OAuth access_token and refresh_token to the token after sign-in
       if (account) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
@@ -43,14 +43,24 @@ const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // Add the accessToken to the session
       session.accessToken = token.accessToken as string;
       return session;
     },
   },
+  pages: {
+    signIn: "/auth/signin",
+    error: "/api/auth/error",
+  },
+  debug: true,
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
 };
 
-// Define and export GET and POST handlers separately for compatibility
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
