@@ -18,7 +18,7 @@ declare module "next-auth/jwt" {
 
 const baseUrl = "https://orange-eureka-97jw7v457wqx376vx-3000.app.github.dev";
 
-const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,

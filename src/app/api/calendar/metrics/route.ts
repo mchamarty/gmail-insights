@@ -1,12 +1,15 @@
-export const dynamic = "force-dynamic";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { NextResponse } from 'next/server';
 import { getCalendarMetrics } from '@/lib/calendar';
 import { handleGoogleAPIError } from '@/lib/errors';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';  // Updated path
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session?.accessToken) {
       return NextResponse.json(

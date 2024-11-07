@@ -1,10 +1,15 @@
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { NextResponse } from 'next/server';
-import { getEmailMetrics } from '@/lib/gmail';
+import { getEmailMetrics } from '@/lib/gmail';  // Updated function name
+import { handleGoogleAPIError } from '@/lib/errors';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';  // Updated path
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session?.accessToken) {
       return NextResponse.json(
@@ -17,10 +22,10 @@ export async function GET() {
     return NextResponse.json(metrics);
     
   } catch (error) {
-    console.error('Gmail API Error:', error);
+    const apiError = handleGoogleAPIError(error);
     return NextResponse.json(
-      { error: 'Failed to fetch email metrics' }, 
-      { status: 500 }
+      { error: apiError.message }, 
+      { status: apiError.status }
     );
   }
 }

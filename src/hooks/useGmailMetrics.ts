@@ -1,46 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import type { EmailMetrics } from '@/lib/gmail'; // Assuming there's a type definition for Gmail metrics
+import { useRetry } from './useRetry';
+import type { EmailMetrics } from '@/lib/gmail';
 
 export function useGmailMetrics() {
   const { data: session } = useSession();
-  const [data, setData] = useState<EmailMetrics | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [isOffline, setIsOffline] = useState(false);
 
-  const fetchMetrics = useCallback(async () => {
-    if (!session) {
-      setIsLoading(false);
-      return;
+  const fetchGmailMetrics = useCallback(async () => {
+    if (!session?.accessToken) {
+      throw new Error('Not authenticated');
     }
 
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await fetch('/api/gmail/metrics'); // Updated endpoint for Gmail metrics
-      if (!response.ok) {
-        throw new Error('Failed to fetch Gmail metrics');
-      }
-      const metrics = await response.json();
-      setData(metrics);
-      setIsOffline(false); // Successfully fetched data, set offline state to false
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'));
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        setIsOffline(true); // If offline, set offline state
-      }
-    } finally {
-      setIsLoading(false);
+    const response = await fetch('/api/gmail/metrics', {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gmail API error: ${response.status} - ${response.statusText}`);
     }
+
+    const metrics = await response.json();
+    return metrics as EmailMetrics;
   }, [session]);
 
-  useEffect(() => {
-    fetchMetrics();
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    retry 
+  } = useRetry<EmailMetrics>(fetchGmailMetrics, [session]);
 
+  useEffect(() => {
     const handleOnline = () => {
       setIsOffline(false);
-      fetchMetrics(); // Retry fetching data when back online
+      retry();
     };
 
     const handleOffline = () => {
@@ -54,12 +50,13 @@ export function useGmailMetrics() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [fetchMetrics]);
+  }, [retry]);
 
-  const retry = () => {
-    setError(null); // Reset error before retrying
-    fetchMetrics();
+  return { 
+    data, 
+    isLoading, 
+    error, 
+    isOffline, 
+    retry 
   };
-
-  return { data, isLoading, error, isOffline, retry };
 }
