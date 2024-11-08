@@ -35,14 +35,37 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
+    async jwt({ token, account, user }) {
+      // Initial sign in
+      if (account && user) {
+        console.log('Initial sign in, setting tokens:', {
+          accessTokenPreview: account.access_token?.substring(0, 10) + '...',
+          hasRefreshToken: !!account.refresh_token
+        });
+        
+        return {
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          user,
+        };
       }
-      return token;
+
+      // Return previous token if the access token has not expired yet
+      if (Date.now() < (token.accessTokenExpires as number)) {
+        console.log('Existing token still valid');
+        return token;
+      }
+
+      console.log('Token needs refresh');
+      // Access token has expired, try to refresh it
+      return refreshAccessToken(token);
     },
-    async session({ session, token }) {
+    async session({ session, token, user }) {
+      console.log('Setting up session:', {
+        hasAccessToken: !!token.accessToken,
+        sessionUser: !!session.user
+      });
+      
       session.accessToken = token.accessToken as string;
       return session;
     },
@@ -60,6 +83,47 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 };
+
+async function refreshAccessToken(token: JWT) {
+  try {
+    const url =
+      "https://oauth2.googleapis.com/token?" +
+      new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        grant_type: "refresh_token",
+        refresh_token: token.refreshToken as string,
+      });
+
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      method: "POST",
+    });
+
+    const refreshedTokens = await response.json();
+
+    if (!response.ok) {
+      throw refreshedTokens;
+    }
+
+    console.log('Token refreshed successfully');
+
+    return {
+      ...token,
+      accessToken: refreshedTokens.access_token,
+      accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
+      refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Fall back to old refresh token
+    };
+  } catch (error) {
+    console.error('Error refreshing access token:', error);
+    return {
+      ...token,
+      error: "RefreshAccessTokenError",
+    };
+  }
+}
 
 const handler = NextAuth(authOptions);
 

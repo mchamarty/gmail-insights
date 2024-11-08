@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import Dashboard from '@/components/dashboard';
+import React, { useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
@@ -11,7 +10,8 @@ import {
   TrendingUp,
   Calendar,
   Mail,
-  LogIn
+  LogIn,
+  Search
 } from 'lucide-react';
 
 import { useGmailMetrics } from '@/hooks/useGmailMetrics';
@@ -20,6 +20,8 @@ import CurrentWorkloadTab from '@/components/dashboard/CurrentWorkloadTab';
 import TimeConsumptionTab from '@/components/dashboard/TimeConsumptionTab';
 import TimeProtectionTab from '@/components/dashboard/TimeProtectionTab';
 import WorkloadImpactTab from '@/components/dashboard/WorkloadImpactTab';
+import EmailAnalysisTab from '@/components/dashboard/EmailAnalysisTab';
+import type { EmailAnalysisResult } from '@/types/email-analysis';
 
 interface DashboardData {
   timeframe: string;
@@ -50,12 +52,11 @@ const fetchDashboardData = async (): Promise<DashboardData> => {
   };
 };
 
-// Helper function to calculate productivity score
 function calculateProductivityScore(emailData: any) {
   if (!emailData) return 0;
 
-  const unreadPenalty = Math.min(emailData.totalUnread * 2, 30); // Max 30 point penalty
-  const responseNeedPenalty = Math.min(emailData.needingResponse * 3, 30); // Max 30 point penalty
+  const unreadPenalty = Math.min(emailData.totalUnread * 2, 30);
+  const responseNeedPenalty = Math.min(emailData.needingResponse * 3, 30);
 
   const baseScore = 100;
   const finalScore = baseScore - unreadPenalty - responseNeedPenalty;
@@ -70,6 +71,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState('current');
   const [data, setData] = React.useState<DashboardData | null>(null);
+  const [emailAnalysis, setEmailAnalysis] = React.useState<EmailAnalysisResult | null>(null);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -103,7 +105,8 @@ export default function DashboardPage() {
     current: 'Today',
     time: 'This Week',
     protection: 'This Week',
-    impact: 'This Month'
+    impact: 'This Month',
+    analysis: 'Last 7 Days'
   } as const;
 
   if (status === 'loading') {
@@ -149,7 +152,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-8">
-          {/* Quick Stats Overview */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <Card className="bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -222,7 +224,6 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Tab Navigation */}
           <div className="space-y-6 bg-card rounded-lg p-4">
             <div className="flex space-x-1 border-b">
               <button
@@ -261,6 +262,15 @@ export default function DashboardPage() {
                   <span>Workload Impact</span>
                 </span>
               </button>
+              <button
+                className={tabStyle(activeTab === 'analysis')}
+                onClick={() => setActiveTab('analysis')}
+              >
+                <span className="flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  <span>Email Analysis</span>
+                </span>
+              </button>
             </div>
 
             <div className="mt-6">
@@ -275,6 +285,12 @@ export default function DashboardPage() {
               )}
               {activeTab === 'impact' && (
                 <WorkloadImpactTab timeframe={timeframeMap.impact} />
+              )}
+              {activeTab === 'analysis' && (
+                <EmailAnalysisTab 
+                  analysis={emailAnalysis}
+                  setAnalysis={setEmailAnalysis}
+                />
               )}
             </div>
           </div>
