@@ -17,19 +17,15 @@ interface EmailMessage {
   subject: string;
   body: string;
   date: string;
+  isUnread: boolean;
 }
 
 async function fetchGmailMessages(accessToken: string, daysBack: number = 7): Promise<EmailMessage[]> {
   try {
     const gmail = getGmailClient(accessToken);
-    
-    // Get messages from the last X days
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
     const query = `after:${Math.floor(startDate.getTime() / 1000)}`;
-
-    console.log('Fetching messages with query:', query);
-    console.log('Using access token:', accessToken.substring(0, 10) + '...');
 
     const messagesResponse = await gmail.users.messages.list({
       userId: 'me',
@@ -37,15 +33,8 @@ async function fetchGmailMessages(accessToken: string, daysBack: number = 7): Pr
       maxResults: 100,
     });
 
-    if (!messagesResponse.data.messages) {
-      console.log('No messages found');
-      return [];
-    }
-
-    console.log(`Found ${messagesResponse.data.messages.length} messages`);
-
     const emails = await Promise.all(
-      messagesResponse.data.messages.map(async (message) => {
+      (messagesResponse.data.messages || []).map(async (message) => {
         const detail = await gmail.users.messages.get({
           userId: 'me',
           id: message.id!,
@@ -53,16 +42,14 @@ async function fetchGmailMessages(accessToken: string, daysBack: number = 7): Pr
         });
 
         const headers = detail.data.payload?.headers || [];
-        const email = {
+        return {
           from: headers.find(h => h.name === 'From')?.value || 'Unknown',
           to: headers.find(h => h.name === 'To')?.value || '',
           subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
           body: detail.data.snippet || '',
           date: headers.find(h => h.name === 'Date')?.value || '',
+          isUnread: detail.data.labelIds?.includes('UNREAD') || false, // Added to capture unread status
         };
-
-        console.log(`Processed email: ${email.subject.substring(0, 30)}...`);
-        return email;
       })
     );
 
@@ -93,12 +80,10 @@ export async function POST(req: Request) {
 
     console.log(`Processing ${emails.length} emails`);
 
-    // Combine all email content for analysis
     const combinedContent = emails.map(email => 
       `From: ${email.from}\nSubject: ${email.subject}\n${email.body}`
     ).join('\n\n');
 
-    // GPT analysis
     console.log('Starting OpenAI analysis...');
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -124,7 +109,6 @@ export async function POST(req: Request) {
 
     console.log('OpenAI analysis complete');
 
-    // Extract entities and patterns
     console.log('Extracting entities...');
     const doc = nlp(combinedContent);
     const entities = {
@@ -148,6 +132,12 @@ export async function POST(req: Request) {
             return acc;
           }, {})
         ).sort(([, a], [, b]) => b - a).slice(0, 10),
+        recentEmails: emails.map(email => ({
+          subject: email.subject,
+          from: email.from,
+          date: email.date,
+          isUnread: email.isUnread, // Use actual unread status
+        })).slice(0, 10)
       },
       analysis: completion.choices[0].message.content || '',
       entities,
