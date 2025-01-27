@@ -5,22 +5,27 @@ import { getGmailClient } from '@/lib/gmail';
 import { clusterTopics } from '@/lib/topicClustering';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import type { EmailAnalysisResult } from '@/types/email-analysis';
+import type { EmailAnalysisResult, EmailMetrics } from '@/types/email-analysis';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 interface EmailMessage {
+  id: string;
+  threadId: string;
   from: string;
   to: string;
   subject: string;
   body: string;
   date: string;
   isUnread: boolean;
+  hasAttachments?: boolean;
+  snippet?: string | undefined;
 }
 
 async function fetchGmailMessages(accessToken: string, daysBack: number = 7): Promise<EmailMessage[]> {
+  console.log('Fetching Gmail messages...');
   try {
     const gmail = getGmailClient(accessToken);
     const startDate = new Date();
@@ -33,6 +38,8 @@ async function fetchGmailMessages(accessToken: string, daysBack: number = 7): Pr
       maxResults: 100,
     });
 
+    console.log(`Found ${messagesResponse.data.messages?.length || 0} messages`);
+
     const emails = await Promise.all(
       (messagesResponse.data.messages || []).map(async (message) => {
         const detail = await gmail.users.messages.get({
@@ -42,17 +49,23 @@ async function fetchGmailMessages(accessToken: string, daysBack: number = 7): Pr
         });
 
         const headers = detail.data.payload?.headers || [];
-        return {
+        const emailMessage: EmailMessage = {
+          id: message.id!,
+          threadId: detail.data.threadId!,
           from: headers.find(h => h.name === 'From')?.value || 'Unknown',
           to: headers.find(h => h.name === 'To')?.value || '',
           subject: headers.find(h => h.name === 'Subject')?.value || 'No Subject',
           body: detail.data.snippet || '',
           date: headers.find(h => h.name === 'Date')?.value || '',
-          isUnread: detail.data.labelIds?.includes('UNREAD') || false, // Added to capture unread status
+          isUnread: detail.data.labelIds?.includes('UNREAD') || false,
+          hasAttachments: detail.data.payload?.parts?.some(part => part.filename),
+          snippet: detail.data.snippet || undefined
         };
+        return emailMessage;
       })
     );
 
+    console.log('Successfully fetched email details');
     return emails;
   } catch (error) {
     console.error('Error fetching Gmail messages:', error);
@@ -61,7 +74,15 @@ async function fetchGmailMessages(accessToken: string, daysBack: number = 7): Pr
 }
 
 export async function POST(req: Request) {
+  console.log('API ROUTE HIT:', new Date().toISOString());
+  
   try {
+    // Read the body once at the start
+    const body = await req.json();
+    console.log('Request body:', body);
+    const { days = 7 } = body;
+
+    console.log('Starting email analysis...');
     const session = await getServerSession(authOptions);
     
     if (!session?.accessToken) {
@@ -69,8 +90,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    console.log('Starting email analysis...');
-    const { days = 7 } = await req.json();
     const emails = await fetchGmailMessages(session.accessToken, days);
 
     if (emails.length === 0) {
@@ -117,8 +136,6 @@ export async function POST(req: Request) {
       places: doc.places().out('array').filter(Boolean),
     };
 
-    console.log(`Found ${entities.people.length} people, ${entities.organizations.length} organizations`);
-
     const result: EmailAnalysisResult = {
       metrics: {
         totalEmails: emails.length,
@@ -133,10 +150,14 @@ export async function POST(req: Request) {
           }, {})
         ).sort(([, a], [, b]) => b - a).slice(0, 10),
         recentEmails: emails.map(email => ({
+          id: email.id,
+          threadId: email.threadId,
           subject: email.subject,
           from: email.from,
           date: email.date,
-          isUnread: email.isUnread, // Use actual unread status
+          isUnread: email.isUnread,
+          hasAttachments: email.hasAttachments,
+          snippet: email.snippet
         })).slice(0, 10)
       },
       analysis: completion.choices[0].message.content || '',
@@ -148,6 +169,18 @@ export async function POST(req: Request) {
       })),
       topicClusters: clusterTopics([...entities.people, ...entities.organizations, ...entities.places]),
       timeframe: `Last ${days} days`,
+      contextualInsights: [],
+      relationships: {
+        topCollaborators: [],
+        activeProjects: [],
+        communicationPatterns: {
+          busyPeriods: [],
+          responseMetrics: {
+            averageTime: 0,
+            bestTime: ''
+          }
+        }
+      }
     };
 
     console.log('Analysis complete, returning results');

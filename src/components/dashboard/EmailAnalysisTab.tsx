@@ -1,65 +1,75 @@
 'use client';
 
-import { useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2, Users, Calendar, Mail, TrendingUp } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Loader2, Mail, Brain, Network, Users, Calendar, AlertTriangle 
+} from 'lucide-react';
+import { EmailInsightsDashboard } from './EmailInsightsDashboard';
 import { ContactsTopicsView } from './ContactsTopicsView';
 import { ActionableInsights } from './ActionableInsights';
 import { AIAnalysisView } from './AIAnalysisView';
-import type { EmailAnalysisResult } from '@/types/email-analysis';
+import { NetworkAnalysis } from './NetworkAnalysis';
+import { useEmailAnalysis } from '@/hooks/useEmailAnalysis';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 
-interface EmailAnalysisTabProps {
-  analysis: EmailAnalysisResult | null;
-  setAnalysis: (analysis: EmailAnalysisResult | null) => void;
-}
-
-export default function EmailAnalysisTab({ analysis, setAnalysis }: EmailAnalysisTabProps) {
+export default function EmailAnalysisTab() {
   const { data: session } = useSession();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedDays, setSelectedDays] = useState(7);
+  const { 
+    data: analysis, 
+    isLoading, 
+    error, 
+    retry,
+    selectedDays,
+    setSelectedDays,
+    stages,
+    progress
+  } = useEmailAnalysis();
 
-  const fetchAnalysis = async () => {
-    if (!session?.accessToken) return;
+  useEffect(() => {
+    console.log('Component mounted with session:', session);
+  }, [session]);
 
-    setIsLoading(true);
-    setError(null);
+  const renderTimeRangeSelect = () => (
+    <select
+      className="px-3 py-2 rounded-md border bg-background"
+      value={selectedDays?.toString()}
+      onChange={(e) => setSelectedDays?.(parseInt(e.target.value))}
+    >
+      <option value="7">Last 7 days</option>
+      <option value="14">Last 14 days</option>
+      <option value="30">Last 30 days</option>
+    </select>
+  );
 
-    try {
-      const response = await fetch('/api/analyze-emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: selectedDays })
-      });
-
-      if (!response.ok) {
-        throw new Error('Analysis failed');
-      }
-
-      const data = await response.json();
-      setAnalysis(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleAnalyze = () => {
+    console.log('Analyze button clicked');
+    console.log('Current session:', session);
+    console.log('Selected days:', selectedDays);
+    retry();
   };
 
-  if (!analysis) {
-    return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Email Analysis</h2>
-            <p className="text-muted-foreground">
-              Analyze your last {selectedDays} days of emails
-            </p>
-          </div>
-          <Button
-            onClick={fetchAnalysis}
+  const renderHeader = () => (
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-2xl font-bold">
+          {analysis ? 'Communication Insights' : 'Enhanced Email Analysis'}
+        </h2>
+        <p className="text-muted-foreground">
+          {isLoading 
+            ? `Analyzing your communications... ${Math.round(progress)}%`
+            : 'Deep analysis of your communications'
+          }
+        </p>
+      </div>
+      <div className="flex items-center gap-4">
+        {renderTimeRangeSelect()}
+        {!analysis && (
+          <Button 
+            onClick={handleAnalyze}
             disabled={isLoading || !session}
           >
             {isLoading ? (
@@ -67,92 +77,140 @@ export default function EmailAnalysisTab({ analysis, setAnalysis }: EmailAnalysi
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Analyzing...
               </>
+            ) : !session ? (
+              'Sign in to analyze'
             ) : (
               'Analyze Emails'
             )}
           </Button>
-        </div>
-
-        {error && (
-          <Card className="bg-destructive/10">
-            <CardContent className="pt-6">
-              <p className="text-destructive">{error}</p>
-            </CardContent>
-          </Card>
         )}
+      </div>
+    </div>
+  );
+
+  const renderError = () => error && (
+    <Card className="bg-destructive/10">
+      <CardContent className="pt-6">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <p className="text-destructive">{error.message}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        {renderHeader()}
+        
+        <Progress 
+          value={Math.min(100, progress)} 
+          className="w-full h-2" 
+        />
+        
+        <div className="grid gap-6 md:grid-cols-2">
+          {stages.map((stage, index) => (
+            <Card key={index}>
+              <CardContent className="pt-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">{stage.name}</h3>
+                  <span className={`text-sm ${
+                    stage.status === 'error' ? 'text-destructive' : 'text-muted-foreground'
+                  }`}>
+                    {stage.status === 'complete' ? '✓' : 
+                     stage.status === 'error' ? '✗' :
+                     stage.status === 'processing' ? `${stage.progress}%` :
+                     'Pending'}
+                  </span>
+                </div>
+                <Progress 
+                  value={stage.progress} 
+                  className={`h-2 ${
+                    stage.status === 'error' ? 'bg-destructive/20' : ''
+                  }`}
+                />
+                <div className="h-32 bg-muted/20 rounded-lg animate-pulse" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+        {renderError()}
+      </div>
+    );
+  }
+
+  if (!analysis) {
+    return (
+      <div className="space-y-8">
+        {renderHeader()}
+        {renderError()}
       </div>
     );
   }
 
   return (
-    <Tabs defaultValue="overview" className="space-y-6">
-      <TabsList>
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="insights">AI Insights</TabsTrigger>
-        <TabsTrigger value="contacts">Contacts & Topics</TabsTrigger>
-        <TabsTrigger value="actions">Actionable Insights</TabsTrigger>
-      </TabsList>
+    <div className="space-y-6">
+      {renderHeader()}
 
-      <TabsContent value="overview" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Emails</CardTitle>
-              <Mail className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{analysis.metrics.totalEmails}</div>
-              <p className="text-xs text-muted-foreground">
-                In the last {selectedDays} days
-              </p>
-            </CardContent>
-          </Card>
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid grid-cols-5 w-full">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            AI Insights
+          </TabsTrigger>
+          <TabsTrigger value="network" className="flex items-center gap-2">
+            <Network className="h-4 w-4" />
+            Network
+          </TabsTrigger>
+          <TabsTrigger value="contacts" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Contacts
+          </TabsTrigger>
+          <TabsTrigger value="actions" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Actions
+          </TabsTrigger>
+        </TabsList>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Key Contacts</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{analysis.entities.people.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Unique contacts identified
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="overview">
+          <EmailInsightsDashboard analysis={analysis} />
+        </TabsContent>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Topic Clusters</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{analysis.topicClusters.nodes.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Key topics identified
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
+        <TabsContent value="insights">
+          <AIAnalysisView 
+            analysis={analysis.analysis}
+            contextualInsights={analysis.contextualInsights}
+          />
+        </TabsContent>
 
-      <TabsContent value="insights" className="space-y-4">
-        <AIAnalysisView analysis={analysis.analysis} />
-      </TabsContent>
+        <TabsContent value="network">
+          <NetworkAnalysis relationships={analysis.relationships} />
+        </TabsContent>
 
-      <TabsContent value="contacts" className="space-y-4">
-        <ContactsTopicsView 
-          entities={analysis.entities}
-          contactDetails={analysis.contactDetails}
-        />
-      </TabsContent>
+        <TabsContent value="contacts">
+          <ContactsTopicsView 
+            entities={analysis.entities}
+            contactDetails={analysis.contactDetails}
+            relationships={analysis.relationships}
+          />
+        </TabsContent>
 
-      <TabsContent value="actions" className="space-y-4">
-        <ActionableInsights 
-          analysis={analysis.analysis}
-          emailMetrics={analysis.metrics}
-        />
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="actions">
+          <ActionableInsights 
+            analysis={analysis.analysis}
+            emailMetrics={analysis.metrics}
+            contextualInsights={analysis.contextualInsights}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {renderError()}
+    </div>
   );
 }
